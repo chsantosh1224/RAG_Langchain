@@ -11,3 +11,7 @@ __pycache__/
 
 # Source documents are data, not code; in AWS they live in S3
 documents/
+
+# Node
+node_modules/
+frontend/dist/
