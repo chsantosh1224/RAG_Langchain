@@ -4,9 +4,11 @@ Run locally: uvicorn app.main:app --port 8000
 """
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import Depends, FastAPI, Response
+from fastapi.responses import HTMLResponse
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 
@@ -14,6 +16,7 @@ from app.config import load_config
 
 load_config()  # before the imports below, which read settings at import time
 
+from app import auth
 from app.auth import get_current_user
 from app.embeddings import TEI_URL
 from app.graph import build_graph, get_checkpoint_pool
@@ -63,6 +66,17 @@ def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
         standalone_question=state["standalone_question"],
         sources=state["sources"],
     )
+
+
+@app.get("/ui", response_class=HTMLResponse)
+def ui():
+    return (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+
+
+@app.get("/ui/config")
+def ui_config():
+    """Public settings the page needs; no secrets."""
+    return {"region": auth.REGION, "clientId": auth.CLIENT_ID}
 
 
 @app.get("/health")
