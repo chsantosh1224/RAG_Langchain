@@ -1,0 +1,18 @@
+# Query API (FastAPI + LangGraph). Runs on EC2 next to the TEI container.
+FROM python:3.12-slim
+
+WORKDIR /srv
+
+# Dependencies first: this layer is cached and only rebuilt when requirements change.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app/ app/
+COPY core/ core/
+
+# Don't run as root inside the container.
+RUN useradd --create-home appuser
+USER appuser
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

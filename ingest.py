@@ -10,18 +10,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.embeddings import TEIEmbeddings
+from app.ingest_service import ingest_file
 from app.vectorstore import ensure_table, get_engine, get_vectorstore
-from core.ingest_lib import chunk_ids, is_supported, load_file, split_documents
+from core.ingest_lib import is_supported
 
 DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "documents")
-
-
-def ingest_file(store, path: str, source: str) -> int:
-    chunks = split_documents(load_file(path, source))
-    store.add_documents(chunks, ids=chunk_ids(chunks))
-    # Prune chunks left over from a previous, longer version of this file.
-    store.delete(filter={"$and": [{"source": source}, {"chunk_index": {"$gte": len(chunks)}}]})
-    return len(chunks)
 
 
 def main():

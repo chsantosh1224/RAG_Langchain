@@ -21,9 +21,17 @@ METADATA_COLUMNS = [
 ]
 
 
+def _is_local(url: str) -> bool:
+    return "@localhost" in url or "@127.0.0.1" in url
+
+
 def get_engine() -> PGEngine:
     # PGEngine is async; asyncpg also works with Windows' default event loop.
-    return PGEngine.from_connection_string(DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1))
+    # asyncpg spells it "ssl", psycopg spells it "sslmode"; RDS requires TLS.
+    url = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1).replace("sslmode=", "ssl=")
+    if "ssl=" not in url and not _is_local(url):
+        url += ("&" if "?" in url else "?") + "ssl=require"
+    return PGEngine.from_connection_string(url)
 
 
 def ensure_table(engine: PGEngine) -> None:

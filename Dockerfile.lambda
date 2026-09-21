@@ -1,0 +1,13 @@
+# Ingest Lambda: SQS -> S3 object -> chunks in pgvector.
+# The embedding model is NOT in this image; it calls TEI on the EC2 instance.
+FROM public.ecr.aws/lambda/python:3.12
+
+COPY requirements.txt ${LAMBDA_TASK_ROOT}/
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+
+COPY app/ ${LAMBDA_TASK_ROOT}/app/
+COPY core/ ${LAMBDA_TASK_ROOT}/core/
+COPY ingest/ ${LAMBDA_TASK_ROOT}/ingest/
+
+# module.function that Lambda calls for each event
+CMD ["ingest.handler.handler"]

@@ -6,12 +6,13 @@ import uuid
 from contextlib import asynccontextmanager
 
 import httpx
-from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Response
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 
-load_dotenv()
+from app.config import load_config
+
+load_config()  # before the imports below, which read settings at import time
 
 from app.auth import get_current_user
 from app.embeddings import TEI_URL
