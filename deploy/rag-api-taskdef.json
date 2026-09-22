@@ -1,0 +1,35 @@
+{
+  "family": "rag-api",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": { "operatingSystemFamily": "LINUX", "cpuArchitecture": "X86_64" },
+  "taskRoleArn": "arn:aws:iam::357601815421:role/rag-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::357601815421:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "357601815421.dkr.ecr.ap-southeast-2.amazonaws.com/rag-api:v5",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8000, "protocol": "tcp" }],
+      "environment": [
+        { "name": "APP_SECRET_ID", "value": "rag/app-config" },
+        { "name": "AWS_REGION", "value": "ap-southeast-2" },
+        { "name": "TEI_URL", "value": "http://10.0.137.79:8080" },
+        { "name": "COGNITO_REGION", "value": "ap-southeast-2" },
+        { "name": "COGNITO_USER_POOL_ID", "value": "ap-southeast-2_y2wbKPFq4" },
+        { "name": "COGNITO_CLIENT_ID", "value": "6uh0i4j6poutlme6jbuvf02q7" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/rag-api",
+          "awslogs-region": "ap-southeast-2",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}
