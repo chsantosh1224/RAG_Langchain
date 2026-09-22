@@ -5,7 +5,7 @@
   "cpu": "512",
   "memory": "1024",
   "runtimePlatform": { "operatingSystemFamily": "LINUX", "cpuArchitecture": "X86_64" },
-  "taskRoleArn": "arn:aws:iam::357601815421:role/rag-ecs-task-role",
+  "taskRoleArn": "arn:aws:iam::357601815421:role/rag-task-role",
   "executionRoleArn": "arn:aws:iam::357601815421:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {

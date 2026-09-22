@@ -1,0 +1,94 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# id-token lets GitHub request a short-lived OIDC token; AWS trades it for a role.
+# No AWS keys are stored in this repository.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-2
+  REGISTRY: 357601815421.dkr.ecr.ap-southeast-2.amazonaws.com
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: rag-api
+            dockerfile: Dockerfile.api
+          - image: rag-frontend
+            dockerfile: Dockerfile.frontend
+          - image: rag-ingest
+            dockerfile: Dockerfile.lambda
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::357601815421:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      # --provenance=false: Lambda rejects the OCI manifest buildx produces by default.
+      - name: Build and push ${{ matrix.image }}
+        run: |
+          docker build --provenance=false --sbom=false \
+            -f ${{ matrix.dockerfile }} \
+            -t $REGISTRY/${{ matrix.image }}:${{ github.sha }} \
+            -t $REGISTRY/${{ matrix.image }}:latest .
+          docker push $REGISTRY/${{ matrix.image }}:${{ github.sha }}
+          docker push $REGISTRY/${{ matrix.image }}:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::357601815421:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ECS: register a task definition revision pointing at the new image, then
+      # let the service roll it out (start new task, wait for healthy, drain old).
+      - name: Deploy frontend to ECS
+        run: |
+          aws ecs register-task-definition \
+            --cli-input-json file://deploy/rag-frontend-taskdef.json \
+            --query 'taskDefinition.revision' --output text
+          aws ecs update-service \
+            --cluster rag-cluster --service rag-frontend \
+            --task-definition rag-frontend --force-new-deployment \
+            --query 'service.serviceName' --output text
+
+      # EC2: pull the new images and restart the compose stack, via SSM (no SSH key).
+      - name: Deploy API to EC2
+        run: |
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids i-07c972f352bf54b9a \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${{ github.sha }}" \
+            --parameters 'commands=[
+              "aws ecr get-login-password --region ap-southeast-2 | docker login --username AWS --password-stdin 357601815421.dkr.ecr.ap-southeast-2.amazonaws.com",
+              "cd /opt/rag && docker compose pull && docker compose up -d"
+            ]' \
+            --query 'Command.CommandId' --output text)
+          aws ssm wait command-executed --command-id "$CMD_ID" --instance-id i-07c972f352bf54b9a
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id i-07c972f352bf54b9a \
+            --query 'StandardOutputContent' --output text
+
+      - name: Update the ingest Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name rag-ingest \
+            --image-uri $REGISTRY/rag-ingest:${{ github.sha }} \
+            --query 'LastModified' --output text
